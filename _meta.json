@@ -1,8 +1,8 @@
 {
   "ownerId": "s173y99zb4sn7mgnw5ttzmgyc983jqrw",
   "slug": "skill-extractor",
-  "version": "1.0.0",
-  "publishedAt": "2026-03-29T01:12:00Z",
+  "version": "1.1.0",
+  "publishedAt": "2026-03-29T08:30:00Z",
   "requiredEnvVars": [],
   "requiredConfigPaths": [],
   "requires": {
