@@ -15,7 +15,7 @@ Package any installed OpenClaw skill into a clean, shareable ZIP. Credentials ar
 - Always list available skills before asking for selection (unless skill name is already given)
 - Always work on a staging copy — never modify the original skill directory or any external paths
 - Scrub ALL staged files — skill dir AND `_external/`
-- Only stage external files whose resolved path contains the skill name (avoids generic system paths)
+- Stage ALL external files referenced in SKILL.md regardless of path name or location
 - If an external file doesn't exist on disk yet (runtime-generated), document it as "created at runtime" — do not error
 - Generate `STRUCTURE.md` inside the staging folder before zipping
 - Default ZIP output: the user's Desktop — confirm with user first
@@ -47,9 +47,9 @@ Create a hidden temp staging folder inside the workspace named after the skill. 
 
 Read the SKILL.md from the original skill directory. Extract all path-like strings that begin with a user home or app-data prefix (home dir shorthands like `~` or `$HOME`, and platform app-data equivalents). Resolve each to an absolute path.
 
-**Only keep paths whose resolved path contains the skill name** — this filters out incidental references to generic system locations.
+Stage every resolved path found — no filtering by name or location. Every file the skill references is included.
 
-For each qualifying path:
+For each path:
 - If it is a **file** that exists: copy it into `_external/` inside the staging dir, mirroring the directory structure relative to the user's home.
 - If it is a **directory** that exists: recursively copy all files inside it into `_external/`, preserving structure.
 - If it doesn't exist yet: skip the copy but record it as a "created at runtime" entry.
