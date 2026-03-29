@@ -18,60 +18,54 @@ Package any installed OpenClaw skill into a clean, shareable ZIP. Credentials ar
 - Only stage external files whose resolved path contains the skill name (avoids generic system paths)
 - If an external file doesn't exist on disk yet (runtime-generated), document it as "created at runtime" — do not error
 - Generate `STRUCTURE.md` inside the staging folder before zipping
-- Default ZIP output: `~/Desktop/<skill-name>.zip` — confirm with user first
-- If ZIP already exists at target, overwrite it (remove first)
-- Clean up staging dir after successful ZIP creation
+- Default ZIP output: the user's Desktop — confirm with user first
+- If ZIP already exists at target, overwrite it
+- Clean up staging after a successful ZIP
 - If any step fails, leave staging intact and report clearly
 
 ---
 
 ## Step 1 — List Available Skills
 
-Scan these directories for subdirectories that contain a `SKILL.md`:
-
-- `<workspace>/skills/`
-- `~/.openclaw/skills/`
-- `~/AppData/Roaming/npm/node_modules/openclaw/skills/`
-
-Present the list with skill name and source directory. Ask which skill to export.
+Scan all known OpenClaw skill locations (workspace skills folder, user-local skills folder, and the bundled npm package skills folder) for subdirectories that contain a `SKILL.md`. Present the list with skill name and source. Ask which to export.
 
 ---
 
 ## Step 2 — Locate Skill
 
-Find the skill folder by name across all three directories. If not found, report and stop.
+Find the skill folder by name. If not found, report and stop.
 
 ---
 
 ## Step 3 — Stage Skill Files
 
-Create a staging root at `<workspace>/.skill-export-staging/<skill-name>/`. Copy all files from the skill directory into it. This is the working copy — originals are never touched.
+Create a hidden temp staging folder inside the workspace named after the skill. Copy all files from the skill directory into it. Originals are never touched.
 
 ---
 
 ## Step 4 — Detect & Stage External Files
 
-Read the SKILL.md from the **original** skill directory. Extract all path-like strings that begin with `~/`, `$HOME/`, `~\`, `$HOME\`, `$env:APPDATA/`, `$env:APPDATA\`, `%APPDATA%/`, or `%APPDATA%\`. Resolve each to an absolute path by substituting the prefix with the actual home or APPDATA directory.
+Read the SKILL.md from the original skill directory. Extract all path-like strings that begin with a user home or app-data prefix (home dir shorthands like `~` or `$HOME`, and platform app-data equivalents). Resolve each to an absolute path.
 
-**Only keep paths whose resolved absolute path contains the skill name** — this filters out incidental references to generic system locations.
+**Only keep paths whose resolved path contains the skill name** — this filters out incidental references to generic system locations.
 
 For each qualifying path:
-- If it resolves to a **file** that exists: copy it into `_external/` inside the staging dir, mirroring the original path structure relative to the home directory.
-- If it resolves to a **directory** that exists: copy all files inside it recursively into `_external/`, preserving structure.
-- If it does not exist on disk: skip the copy but record it as a "created at runtime" entry.
+- If it is a **file** that exists: copy it into `_external/` inside the staging dir, mirroring the directory structure relative to the user's home.
+- If it is a **directory** that exists: recursively copy all files inside it into `_external/`, preserving structure.
+- If it doesn't exist yet: skip the copy but record it as a "created at runtime" entry.
 
-Build a map of every external entry: `{ stagedPath, targetPath, exists }`. This map drives the STRUCTURE.md external table.
+Build a map of every external entry — staged path, target path, and whether it existed. This drives the STRUCTURE.md external table.
 
 ---
 
 ## Step 5 — Scrub Credentials
 
-Scan every file in the staging dir (including `_external/`) whose extension is `.json`, `.env`, `.yaml`, `.yml`, or `.toml`. For each field whose **name** contains any of the following terms (case-insensitive), set its **value** to `""`:
+Scan every file in the staging dir (including `_external/`) with extension `.json`, `.env`, `.yaml`, `.yml`, or `.toml`. For each field whose **name** contains any of these terms (case-insensitive), set its **value** to `""`:
 
 `token`, `secret`, `password`, `apikey`, `api_key`, `auth`, `bearer`, `jwt`, `access_key`, `private_key`, `client_secret`, `webhook`, `passphrase`, `pin`, `otp`, `seed`, `cert`, `credential`, `private`
 
-- JSON: parse the file, walk all keys recursively, clear matching string values, write back (UTF-8 no BOM)
-- `.env`: for each line matching `KEY=value`, clear the value if the key matches — output `KEY=`
+- JSON: parse, walk all keys recursively, clear matching string values, write back (UTF-8 no BOM)
+- `.env`: clear the value portion of any matching `KEY=value` line — output `KEY=`
 - YAML/TOML: line-by-line — if a line's key portion matches, clear the quoted value to `""` or `''`
 - If a file can't be parsed, warn and skip — do not stop
 
@@ -79,24 +73,15 @@ Scan every file in the staging dir (including `_external/`) whose extension is `
 
 ## Step 6 — Generate STRUCTURE.md
 
-Write `STRUCTURE.md` into the staging dir. It must contain the following sections in order:
+Write `STRUCTURE.md` into the staging dir with these sections in order:
 
-### Header
-```
-# Skill: <skill-name>
-Auto-generated by skill-extractor on <timestamp>.
-This file helps LLM agents and humans understand, verify, and install this skill correctly.
-```
+**Header** — skill name, generation timestamp, one-line purpose statement.
 
-### Folder Layout
-An ASCII tree of the staging dir. Directories before files at each level, both sorted alphabetically. Use `├──`, `└──`, `│` connectors. Directory names end with `/`.
+**Folder Layout** — ASCII tree of the staging dir. Directories before files at each level, both sorted alphabetically. Use standard tree connectors (`├──`, `└──`, `│`). Directory names end with `/`.
 
-### File Descriptions table
-Two columns: `File` and `Purpose`. One row per file, path relative to the staging dir using forward slashes.
+**File Descriptions table** — two columns: relative file path and purpose. Use the following descriptions:
 
-Use these descriptions:
-
-| Filename / extension | Description |
+| File | Description |
 |---|---|
 | `SKILL.md` | Main skill instructions. The LLM agent reads this to understand purpose, setup, and usage. |
 | `_meta.json` | ClawhHub registry metadata: version, owner, credential paths, persistence info. ownerId cleared. |
@@ -104,46 +89,39 @@ Use these descriptions:
 | `.env` | Environment variable defaults. Credential values cleared — fill in before use. |
 | `*.json` | Configuration or data file. Credential values cleared — fill in before use. |
 | `*.ps1` | PowerShell script. Review before running. |
-| `*.sh` | Shell script. Make executable with `chmod +x` before running. |
+| `*.sh` | Shell script. Make executable before running. |
 | `*.py` | Python script. |
 | `*.md` | Documentation or reference file. |
 | `*.yaml` / `*.yml` | YAML configuration. Credential values cleared if present. |
 | `*.toml` | TOML configuration. Credential values cleared if present. |
 | anything else | Supporting file. |
 
-### External Files table (only if external files exist)
-Three columns: `File in ZIP`, `Install to (target machine)`, `Notes`.
+**External Files table** — only if external files were detected. Three columns: file path inside the ZIP | target install path on the machine | notes. Determine the notes value by this logic:
 
-One row per entry from the external map:
-
-| Condition | Notes value |
+| Condition | Notes |
 |---|---|
-| Path matches `credentials` or `config` | Credential values cleared — fill in before use. |
-| Path matches `worker` | Worker script. Extracted from SKILL.md at runtime — included here for reference. |
-| Path matches `.log`, `.pid`, or `.state.json` | Runtime-generated by the skill. Recreated automatically on first run. |
-| Path did not exist (created at runtime) | Not present at export time — created automatically when the skill runs. |
+| Path suggests credentials or config | Credential values cleared — fill in before use. |
+| Path suggests a worker script | Extracted from SKILL.md at runtime — included here for reference. |
+| Path suggests a log, pid, or state file | Runtime-generated. Recreated automatically on first run. |
+| File did not exist at export time | Not present at export — created automatically when the skill runs. |
 | Anything else | External runtime file. Review SKILL.md for usage. |
 
-Follow the table with a short install snippet for both Windows (PowerShell `Copy-Item`) and macOS/Linux (`cp -r`) showing how to place `_external/` files at their target paths.
+Follow the table with a brief note on how to place `_external/` files at their target paths on both Windows and Unix systems.
 
-### Install Instructions
-Three options:
+**Install Instructions** — three options:
+- Option A: install via ClawhHub if the skill is published
+- Option B: manual — copy the skill folder into the workspace skills directory, place any `_external/` files at their target paths, fill in credentials, confirm with `openclaw skills list`
+- Option C: local clawhub install, then handle `_external/` files manually
 
-- **Option A — ClawhHub** (if published): `clawhub install <skill-name>`
-- **Option B — Manual**: extract ZIP → copy `<skill-name>/` folder (excluding `_external/`) to `<workspace>/skills/` → copy each `_external/` file to its target path (see table) → fill in credentials → run `openclaw skills list` to confirm
-- **Option C — Local clawhub**: `clawhub install ./<skill-name>`, then handle `_external/` files manually
+**Credential Note** — all values cleared; fill in before use; never commit credential files to version control.
 
-### Credential Note
-All credential values have been cleared. Fill in before use. Refer to `SKILL.md` for field names and paths. Never commit credential files to version control.
-
-### Footer
-`*Generated by skill-extractor — https://clawhub.ai/seph1709/skill-extractor*`
+**Footer** — credit line linking to the skill on ClawhHub.
 
 ---
 
 ## Step 7 — Zip and Deliver
 
-Confirm the output path with the user (default: `~/Desktop/<skill-name>.zip`). If a ZIP already exists there, remove it first. Compress the staging dir. Report the saved path and file size in KB. Delete the staging root.
+Confirm the output path with the user (default: the user's Desktop). Remove any existing ZIP at that path first. Compress the staging dir. Report the saved path and file size. Delete the staging folder.
 
 ---
 
@@ -152,8 +130,8 @@ Confirm the output path with the user (default: `~/Desktop/<skill-name>.zip`). I
 | Problem | Cause | Fix |
 |---|---|---|
 | Skill not found | Name mismatch | Check spelling; run `openclaw skills list` |
-| Access denied on copy | File ownership issue | Run terminal as admin or check source permissions |
-| ZIP creation fails | PowerShell < 5 or disk full | Update PowerShell or free disk space |
-| JSON parse error | Non-standard JSON (comments, trailing commas) | Scrubber skips safely; inspect manually |
-| Staging not cleaned | ZIP step failed | Delete `<workspace>/.skill-export-staging` manually |
+| Access denied on copy | File ownership issue | Run as admin or check permissions |
+| ZIP creation fails | PowerShell < 5 or disk full | Update PowerShell or free space |
+| JSON parse error | Non-standard JSON | Scrubber skips safely; inspect manually |
+| Staging not cleaned | ZIP step failed | Delete the staging folder inside the workspace manually |
 | External file missing | Runtime-generated, not yet created | Safe to skip — document as "created at runtime" |
