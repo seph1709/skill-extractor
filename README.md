@@ -1,16 +1,16 @@
 # 📦 skill-extractor
 
-> An [OpenClaw](https://openclaw.ai) skill that exports any installed skill into a clean, shareable ZIP — with credential scrubbing and an auto-generated `STRUCTURE.md` so anyone (or any LLM) can understand and reinstall it.
+> An [OpenClaw](https://openclaw.ai) skill that exports any installed skill into a clean, shareable ZIP — including external runtime files — with an auto-generated `STRUCTURE.md` so anyone (or any LLM) can understand and reinstall it correctly.
 
 ---
 
 ## What It Does
 
 1. **Lists** all installed skills across your OpenClaw skill directories
-2. **Copies** the selected skill to a temp staging area (source is never modified)
-3. **Scrubs** credential values from `.json`, `.env`, `.yaml`, and `.toml` files — sensitive fields (tokens, secrets, passwords, API keys, etc.) are set to `""`
-4. **Generates `STRUCTURE.md`** — a folder tree + per-file descriptions + install instructions, readable by both humans and LLM agents
-5. **Zips** everything into a shareable `.zip` file
+2. **Stages** the selected skill to a temp folder — originals are never touched
+3. **Detects external files** — scans the skill's `SKILL.md` for any file paths referenced outside the skill folder (config files, worker scripts, state files, etc.) and stages them under `_external/`
+4. **Generates `STRUCTURE.md`** — folder tree, per-file descriptions, and an external files table that maps each file to its install target path
+5. **Zips** everything into a shareable file and delivers it to your Desktop
 6. **Cleans up** staging automatically
 
 ---
@@ -29,8 +29,8 @@ Or manually — copy the `skill-extractor/` folder into your OpenClaw workspace 
 
 Just ask your OpenClaw agent:
 
-> "Export the `github` skill"
-> "Use skill-extractor to package `gog`"
+> "Export the `facebook-page` skill"  
+> "Use skill-extractor to package `gog`"  
 > "Zip up the `weather` skill so I can share it"
 
 The agent will walk you through selection (if no skill is named), confirm the output path, and deliver a ready-to-share ZIP to your Desktop.
@@ -39,66 +39,43 @@ The agent will walk you through selection (if no skill is named), confirm the ou
 
 ## Output Structure
 
-The generated ZIP contains:
-
 ```
 <skill-name>/
-├── SKILL.md         ← original skill instructions (unchanged)
-├── _meta.json       ← registry metadata (ownerId cleared)
-├── STRUCTURE.md     ← auto-generated install guide ✨
-└── ...              ← any other skill files, credentials scrubbed
+├── SKILL.md            ← skill instructions
+├── _meta.json          ← registry metadata
+├── STRUCTURE.md        ← auto-generated install guide
+├── ...                 ← any other files in the skill folder
+└── _external/          ← external runtime files (if any)
+    └── .config/
+        └── <skill>/
+            ├── credentials.json
+            └── worker.ps1
 ```
 
-### STRUCTURE.md preview
+### What's inside STRUCTURE.md
 
-```markdown
-# Skill: github
-
-## Folder Layout
-github/
-├── SKILL.md
-└── _meta.json
-
-## File Descriptions
-| File | Purpose |
-|------|---------|
-| `SKILL.md` | Main skill instructions. The LLM reads this... |
-| `_meta.json` | ClawhHub registry metadata... |
-
-## How to Install
-### Option A — ClawhHub
-clawhub install github
-...
-```
+- **Folder layout** — ASCII tree of the full package
+- **File descriptions** — what each file does, described by purpose not type
+- **External files table** — maps every file in `_external/` to where it should be placed on the target machine, with install notes
+- **Install instructions** — three options: ClawhHub, manual, or local clawhub install
 
 ---
 
-## Credential Scrubbing
+## Why External Files Matter
 
-Fields matching these patterns are zeroed out before packaging:
+Many skills generate or depend on files that live outside the skill folder — worker scripts, config files, state trackers, and more. Without these, the skill won't work on a fresh machine.
 
-`token` · `secret` · `password` · `api_key` · `apikey` · `auth` · `bearer` · `jwt` · `access_key` · `private_key` · `client_secret` · `webhook` · `passphrase` · `pin` · `otp` · `seed` · `cert` · `credential`
-
-Applies to: `.json` (deep recursive), `.env` (line-based), `.yaml` / `.toml` (line-based).
-
-> The original skill directory is **never modified** — all scrubbing happens on a staging copy.
+skill-extractor finds every external path referenced in the skill's `SKILL.md`, copies them into the ZIP under `_external/`, and documents exactly where they need to go. The receiver gets a complete, self-documenting package with no guesswork.
 
 ---
 
-## Requirements
+## Use Cases
 
-- PowerShell 5+ (Windows) or `pwsh` (macOS/Linux)
-- [OpenClaw](https://openclaw.ai) with an agent that can run PowerShell
-
----
-
-## Publishing Your Own Skills
-
-Once you've exported a skill, you can publish it to ClawhHub:
-
-```bash
-clawhub publish ./skill-name --slug skill-name --name "My Skill" --version 1.0.0
-```
+- **Sharing a skill** with a teammate — they get everything they need in one ZIP, with a clear install map
+- **Backing up a skill** before making changes — full snapshot including all runtime files
+- **Moving skills between machines** — no need to manually retrace config paths
+- **Auditing a skill** — `STRUCTURE.md` shows every file the skill touches outside its own folder
+- **Preparing for ClawhHub publishing** — reviewable snapshot before uploading
 
 ---
 
