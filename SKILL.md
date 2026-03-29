@@ -1,6 +1,6 @@
 ---
 name: skill-extractor
-description: "Export any installed OpenClaw skill into a shareable ZIP: detects & stages external runtime files, generates STRUCTURE.md for LLM-guided install. Local only — no APIs, no tokens, no external calls."
+description: "Export any installed OpenClaw skill into a shareable ZIP: detects & stages external runtime files, generates STRUCTURE.md for LLM-guided install. Reads and packages local files only — no network calls, no APIs, no external transmissions."
 metadata: {"openclaw":{"emoji":"📦"}}
 ---
 
@@ -8,13 +8,16 @@ metadata: {"openclaw":{"emoji":"📦"}}
 
 Package any installed OpenClaw skill into a clean, shareable ZIP. External runtime files referenced in SKILL.md are detected, staged under `_external/`, and documented — so a new install knows exactly where every file belongs and can reproduce full functionality.
 
+> All file operations are local only. Nothing is transmitted anywhere. The user confirms what gets included before anything is zipped.
+
 ---
 
 ## Agent Rules
 
 - Always list available skills before asking for selection (unless skill name is already given)
 - Always work on a staging copy — never modify the original skill directory or any external paths
-- Stage ALL external files referenced in SKILL.md regardless of path name or location
+- **Always show the user what external files were found and get explicit confirmation before zipping**
+- Files are packaged as-is — values are not modified. Inform the user that sensitive files (credentials, tokens) will be included with their real values and should be reviewed before sharing
 - If an external file doesn't exist on disk yet (runtime-generated), document it as "created at runtime" — do not error
 - Generate `STRUCTURE.md` inside the staging folder before zipping
 - Default ZIP output: the user's Desktop — confirm with user first
@@ -42,22 +45,36 @@ Create a hidden temp staging folder inside the workspace named after the skill. 
 
 ---
 
-## Step 4 — Detect & Stage External Files
+## Step 4 — Detect External Files
 
 Read the SKILL.md from the original skill directory. Extract all path-like strings that begin with a user home or app-data prefix (home dir shorthands and platform app-data equivalents). Resolve each to an absolute path.
 
-Stage every resolved path found — no filtering by name or location. Every file the skill references is included.
-
 For each path:
-- If it is a **file** that exists: copy it into `_external/` inside the staging dir, mirroring the directory structure relative to the user's home.
-- If it is a **directory** that exists: recursively copy all files inside it into `_external/`, preserving structure.
-- If it doesn't exist yet: skip the copy but record it as a "created at runtime" entry.
+- If it is a **file** that exists: add it to the external files list.
+- If it is a **directory** that exists: add all files inside it recursively to the list.
+- If it doesn't exist yet: record it as a "created at runtime" entry.
 
-Build a map of every external entry — staged path, target path, and whether it existed. This drives the STRUCTURE.md external table.
+**Do not copy anything yet.** Build the list first — it goes to the user for review in the next step.
 
 ---
 
-## Step 5 — Generate STRUCTURE.md
+## Step 5 — Confirm with User
+
+Present the user with everything that will be included in the ZIP:
+
+1. All files from the skill directory
+2. The full list of detected external files with their resolved paths
+
+Clearly warn: **"These files will be packaged with their real values — including any credentials, tokens, or sensitive config. Review before sharing the ZIP."**
+
+Ask: *"Proceed with packaging these files?"*
+
+- If **yes**: stage the external files into `_external/`, mirroring the directory structure relative to the user's home, then continue.
+- If **no**: abort and clean up staging. Do not create a ZIP.
+
+---
+
+## Step 6 — Generate STRUCTURE.md
 
 Write `STRUCTURE.md` into the staging dir with these sections in order:
 
@@ -78,7 +95,7 @@ Write `STRUCTURE.md` into the staging dir with these sections in order:
 
 | Condition | Notes |
 |---|---|
-| Path suggests credentials or config | Fill in required values before use. |
+| Path suggests credentials or config | Packaged with real values — review before sharing. |
 | Path suggests a worker or background script | Extracted from SKILL.md at runtime — included here for reference. |
 | Path suggests a log, pid, or state file | Runtime-generated. Recreated automatically on first run. |
 | File did not exist at export time | Not present at export — created automatically when the skill runs. |
@@ -95,7 +112,7 @@ Follow the table with a brief note on how to place `_external/` files at their t
 
 ---
 
-## Step 6 — Zip and Deliver
+## Step 7 — Zip and Deliver
 
 Confirm the output path with the user (default: the user's Desktop). Remove any existing ZIP at that path first. Compress the staging dir. Report the saved path and file size. Delete the staging folder.
 
@@ -110,3 +127,4 @@ Confirm the output path with the user (default: the user's Desktop). Remove any 
 | ZIP creation fails | Disk full or missing compression support | Free space or update runtime |
 | Staging not cleaned | ZIP step failed | Delete the staging folder inside the workspace manually |
 | External file missing | Runtime-generated, not yet created | Safe to skip — document as "created at runtime" |
+| User declined confirmation | Sensitive files flagged by user | Abort — no ZIP created, staging cleaned up |
