@@ -1,12 +1,8 @@
 {
   "ownerId": "s173y99zb4sn7mgnw5ttzmgyc983jqrw",
   "slug": "skill-extractor",
-  "version": "1.4.0",
-  "publishedAt": "2026-03-29T08:42:00Z",
+  "version": "1.5.0",
+  "publishedAt": "2026-03-29T08:46:00Z",
   "requiredEnvVars": [],
-  "requiredConfigPaths": [],
-  "requires": {
-    "anyBinaries": ["powershell", "pwsh"],
-    "os": ["windows", "macos", "linux"]
-  }
+  "requiredConfigPaths": []
 }
